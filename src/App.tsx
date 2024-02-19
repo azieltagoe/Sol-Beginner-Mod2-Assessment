@@ -96,23 +96,40 @@ export default function App() {
    * This function is called when the Create a New Solana Account button is clicked
    */
   const createSender = async () => {
-    // create a new Keypair
-
-
-    console.log('Sender account: ', senderKeypair!.publicKey.toString());
-    console.log('Airdropping 2 SOL to Sender Wallet');
+    const from = Keypair.generate();
+      console.log(from.secretKey);
+    
+    // Connect to the Devnet
+    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");   
+          
 
     // save this new KeyPair into this state variable
-    setSenderKeypair(/*KeyPair here*/);
+    setSenderKeypair(from);
+
+    console.log('Sender account: ', from.publicKey.toString());
+    console.log('Airdropping 2 SOL to Sender Wallet');
 
     // request airdrop into this new account
+
+    const fromAirDropSignature = await connection.requestAirdrop(
+        new PublicKey(from.publicKey),
+        2 * LAMPORTS_PER_SOL
+    );
     
 
     const latestBlockHash = await connection.getLatestBlockhash();
 
     // now confirm the transaction
 
-    console.log('Wallet Balance: ' + (await connection.getBalance(senderKeypair!.publicKey)) / LAMPORTS_PER_SOL);
+    await connection.confirmTransaction({
+      blockhash: latestBlockHash.blockhash,
+      lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+      signature: fromAirDropSignature
+  });
+
+   console.log("Airdrop completed for the Sender account");
+
+    console.log('Wallet Balance: ' + (await connection.getBalance(from.publicKey)) / LAMPORTS_PER_SOL);
   }
 
   /**
@@ -128,8 +145,11 @@ export default function App() {
       try {
         // connect to phantom wallet and return response which includes the wallet public key
 
+        const response = await solana.connect();
+        console.log('wallet account ', response.publicKey.toString());
+
         // save the public key of the phantom wallet to the state variable
-        setReceiverPublicKey(/*PUBLIC KEY*/);
+        setReceiverPublicKey(response.publicKey.toString());
       } catch (err) {
         console.log(err);
       }
@@ -164,7 +184,25 @@ export default function App() {
     
     // create a new transaction for the transfer
 
+    const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+
     // send and confirm the transaction
+
+    const to = Keypair.generate();
+
+    var transaction = new Transaction().add(
+      SystemProgram.transfer({
+          fromPubkey: senderKeypair!.publicKey,
+          toPubkey: to.publicKey,
+          lamports: LAMPORTS_PER_SOL
+      })
+  );
+  var signature = await sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [senderKeypair!]
+  );
+    console.log('Signature is', signature);
 
     console.log("transaction sent and confirmed");
     console.log("Sender Balance: " + await connection.getBalance(senderKeypair!.publicKey) / LAMPORTS_PER_SOL);
